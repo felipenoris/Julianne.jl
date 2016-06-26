@@ -2,7 +2,7 @@ The Julianne.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2016: Felipe Noronha and other contributors:
 >
-> https://github.com/juliannebot/Julianne.jl/contributors
+> https://github.com/felipenoris/Julianne.jl/contributors
 >
 > Permission is hereby granted, free of charge, to any person obtaining
 > a copy of this software and associated documentation files (the

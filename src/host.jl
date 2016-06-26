@@ -5,24 +5,22 @@ module Host
 
 import ..HostState
 import ..TestResult
-import ..TestWorker
-import ..PkgStatus
+import ..Worker
 import ..PkgRef
 import ..Commit
-import ..Worker.register
+import ..Worker
+import ..WorkerSock
+import ..WorkerInfo
 import ..HOST
 
-const STATE = HostState()
-
-# List of packages to be tested
-push!(STATE.packages, PkgRef("PassingPkg", "https://github.com/juliannebot/PassingPkg.jl.git"))
-push!(STATE.packages, PkgRef("FailingPkg", "https://github.com/juliannebot/FailingPkg.jl.git"))
-
-# Set's head commit
-STATE.head_sha = "e62b204599418164e8a3cbcf88dc6ff556c3ad83"
+rm_if_exists(f) = isfile(f) && rm(f)
 
 # Get's the latest julia's repo and updates list of commits.
-function refresh()
+function pull_julia_repo()
+	print("Updating julia repo...")
+	
+	const HOME_DIR = HOST.working_dir
+
 	if !isdir(HOME_DIR)
 		throw(ErrorException("home dir not found: $HOME_DIR"))
 	end
@@ -34,7 +32,8 @@ function refresh()
 		run(`git clone https://github.com/JuliaLang/julia.git`)
 	end
 
-	isfile("commits.txt") && rm("commits.txt")
+	rm_if_exists("commits.txt")
+	rm_if_exists("subjects.txt")
 	cd("julia")
 	run(`git pull`)
 	run(pipeline(`git log --pretty=format:%H`, joinpath("..", "commits.txt")))
@@ -45,72 +44,108 @@ function refresh()
 	file_s = open("subjects.txt")
 	c = ""
 
-	empty!(STATE.commit_list)
+	empty!(HOST.commit_list)
 
-	while c != head_sha()
+	while c != HOST.head_sha
 		c = chomp(readline(file_c))
 		s = chomp(readline(file_s))
 
 		println("$c : $s")
-		push!(STATE.commit_list, Commit(c, s))
+		push!(HOST.commit_list, Commit(c, s))
 	end
 
 	close(file_c)
 	close(file_s)
+	rm_if_exists("commits.txt")
+	rm_if_exists("subjects.txt")
+	println(" done!")
 end
 
-function main()
-
-	const connections=Set()
-
-	# listens for connections
+# listens for connections on background
+function schedule_listen_task()
 	@schedule begin
     	srvr = listen(HOST.port)
     	while true
-        	sock = accept(srvr)
-        	push!(connections, sock)
+    		socket = accept(srvr)
+        	try
+        		handshake(socket)
+        	catch e
+        		println("Couldn't accept connection: $e")
+        		isopen(socket) && close(socket)
+        	end
     	end
 	end
+end
 
-	# starts local workers
-	for ww in 1:4
-		@schedule begin
-			register()
+function handshake(socket::TCPSocket)
+	serialize(socket, :HELLO_WORKER)
+	resp = deserialize(socket)
+	resp != :HELLO_MASTER && throw(ErrorException("Unexpected handshake: '$resp'."))
+	serialize(socket, :WHO_ARE_YOU)
+	worker = deserialize(socket)
+	!isa(worker, WorkerInfo) && throw(ErrorException("Unexpected handshake: Should receive WorkerInfo. Got '$worker'."))
+	push!(HOST.workersocks, WorkerSock(worker, socket))
+	println("New worker connected! Go for it, '$worker.id' !")
+end
+
+workerscount() = length(HOST.workersocks)
+
+function start(ip, port)
+	HOST.ip = ip
+	HOST.port = port
+	start()
+end
+
+function start()
+
+	schedule_listen_task()
+
+	# starting local workers
+	sleep(0.2) # let's go slow...
+	if nprocs() == 1
+		println("No local workers will be created. Use addprocs(n) before running `start_host()` to allow for local workers.")
+	else
+		for ww in procs()
+			ww == 1 && continue
+			@spawnat ww Worker.start("Local worker $ww", HOST.ip, HOST.port)
 		end
 	end
 
 	# main loop for server work
-	i = 1
 	while true
-		refresh()
+		
+		while workerscount() == 0
+			println("No workers registered. Will wait...")
+			sleep(5)
+		end
+
+		pull_julia_repo()
 
 		# dispatch workload for workers
-		i = dispatch(i, connections)
+		#i = dispatch()
 
-		show(STATE)
+		show(HOST.results_dict)
 		sleep(120) # seconds
 	end
 end
 
-function dispatch(t, connections)
+#=
+function dispatch()
 
-	tt = t
-
-    # This function will wait for a maximum of 120 seconds for remote workers to return
-    tc = Condition()
+	tc = Condition()
     @schedule (sleep(120); notify(tc))
 
     response_channel = Channel()
 
     nconn = 0
-    conn2 = copy(connections)
+    conn2 = copy(HOST.connections)
 
     for c in conn2
 
     	# TODO: calculate execution pipeline, for now tests only the first package
     	# 		for all commits in a circular fashion
     	pkgref = copy(STATE.packages[1])
-    	pkgref.commit = STATE.commit_list[tt]
+    	pkgref.commit = STATE.commit_list[1]
 
         nconn += 1 
         @async try                     # <---- start all remote requests
@@ -118,7 +153,7 @@ function dispatch(t, connections)
             put!(response_channel, deserialize(c))
         catch e
             put!(response_channel, :ERROR)
-            delete!(connections, c)
+            delete!(CONNECTIONS, c)
         finally
             notify(tc)
         end
@@ -141,9 +176,10 @@ function dispatch(t, connections)
 
     # TODO: update test status with results
 end
+=#
 
 function update_result(r::TestResult)
-	STATE.commit_dict[r.ref.commit] = [ PkgStatus(r.ref, "Tested...", v"0.0.1") ]
+	HOST.results_dict[r.ref.commit] = [r]
 end
 
 # TODO: listen to github mentions

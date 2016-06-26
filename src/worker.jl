@@ -3,28 +3,33 @@
 
 module Worker
 
-
 import ..PkgRef
 import ..Commit
 import ..sha_abbrev
-import ..HOST
+import ..WorkerInfo
+import ..TestResult
 
 const SRC_DIR = dirname(@__FILE__)
 
 # updates HEAD and TARGET files used by the Dockerfile
-function refresh_docker_markers(head, target)
+function refresh_docker_head_marker(head_sha::AbstractString)
 	try
-		# HEAD
 		head_filepath = joinpath(SRC_DIR, "docker", "HEAD")
 		if isfile(head_filepath)
 			rm(head_filepath)
 		end
 
 		head_file = open(head_filepath, "w")
-		write(head_file, head)
+		write(head_file, head_sha)
 		close(head_file)
+	catch e
+		print("error $e")
+	end
+end
 
-		# TARGET
+# updates HEAD and TARGET files used by the Dockerfile
+function refresh_docker_target_marker(target_sha::AbstractString)
+	try
 		target_filepath = joinpath(SRC_DIR, "docker", "TARGET")
 		if isfile(target_filepath)
 			rm(target_filepath)
@@ -72,19 +77,29 @@ function testpkg(pkg::PkgRef)
 end
 
 # connects to host and waits for the workload
-function register()
-	println("registering...")
-
-	@schedule begin
-		c = connect(HOST.ip, HOST.port)
-    	while true
-        	pkgref = deserialize(c)    # <--- Block wait for a request
-        	println("going to test $(pkgref.name)")
-        	result = testpkg(pkgref)
-        	println("Received request for $(pkgref.name). Response $result.")
-        	serialize(c, result)        # <--- send back response
-    	end
+function start(my_worker_id::AbstractString, ip, port)
+	sock = connect(ip, port)
+	println("Connected to Host!")
+	try
+		resp = deserialize(sock)
+		resp != :HELLO_WORKER && throw(ErrorException("Unexpected handshake: '$resp'."))
+		serialize(sock, :HELLO_MASTER)
+		resp = deserialize(sock)
+		resp != :WHO_ARE_YOU && throw(ErrorException("Unexpected handshake: '$resp'."))
+		serialize(sock, WorkerInfo(my_worker_id))
+	catch e
+		println("Couldn't connect to host: $e.")
+		isopen(sock) && close(sock)
 	end
+
+	#while true
+    #   	pkgref = deserialize(c)    # <--- Block wait for a request
+    #   	println("going to test $(pkgref.name)")
+    #   	result = testpkg(pkgref)
+    #   	println("Received request for $(pkgref.name). Response $result.")
+    #   	serialize(c, result)        # <--- send back response
+    #   	println("Result was sent to Host!")
+    #end
 end
 
 end # module
