@@ -13,13 +13,16 @@ type WorkerInfo
 	id::AbstractString
 	julia_version::VersionNumber
 	versioninfo::AbstractString
+	OS::Symbol
+	MACHINE::AbstractString
+	WORD_SIZE::Int
 
 	WorkerInfo(id) = begin
 		io = IOBuffer()
 		versioninfo(io, false)
 		s = bytestring(io)
 		close(io)
-		new(id, VERSION, s)
+		new(id, VERSION, s, Sys.OS_NAME, Sys.MACHINE, Sys.WORD_SIZE) # for v0.5, names are different
 	end
 end
 
@@ -35,26 +38,30 @@ type PkgRef
 	PkgRef(name, url) = new(name, url)
 end
 
-type TestResult
+@enum WorkerTaskState UNTESTED=1 PASSED=2 FAILURE=3 NOT_CONCLUSIVE=4
+
+type WorkerTask
 	ref::PkgRef
-	passed::Bool
+	state::WorkerTaskState
 	error_message::AbstractString
 	version::VersionNumber
-	commit::Commit # identifies the commit referente on julia's master branch
+	head_commit::Commit # identifies the commit referente on julia's master branch
+	target_commit::Commit # identifies the commit referente on julia's master branch
+	worker::WorkerInfo # Who tested this
 end
 
 type HostState
-	ip::AbstractString
+	ip::IPAddr
 	port::Int
 	working_dir::AbstractString
 	lastupdate::DateTime
 	commit_list::Vector{Commit} # Ordered list of commits
-	results_dict::Dict{Commit, Vector{TestResult}} # maps Commit to test status. If it's not there, hasn't been dispached yet for testing
+	results_dict::Dict{Commit, Vector{WorkerTask}} # maps Commit to test status. If it's not there, hasn't been dispached yet for testing. The vector allows for one test for each package.
 	workersocks::Vector{WorkerSock} # registered workers
 	packages::Vector{PkgRef}
 	head_sha::AbstractString
 
-	HostState(ip, port, working_dir) = new(ip, port, working_dir, now(), Array(AbstractString, 0), Dict{AbstractString, Vector{TestResult}}(), Array(WorkerSock, 0), Array(PkgRef, 0), "")
+	HostState(ip, port, working_dir) = new(ip, port, working_dir, now(), Array(AbstractString, 0), Dict{AbstractString, Vector{WorkerTask}}(), Array(WorkerSock, 0), Array(PkgRef, 0), "")
 end
 
 # TODO: show() methods ...

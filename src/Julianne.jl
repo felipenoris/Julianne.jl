@@ -2,6 +2,7 @@
 module Julianne
 
 using GitHub
+import Base.IPAddr
 
 include("types.jl")
 include("hostconfig.jl")

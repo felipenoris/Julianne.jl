@@ -1,6 +1,6 @@
 
 const HOST = HostState(
-	"localhost",
+	ip"127.0.0.1",
 	8023,
 	"/julianne"
 )

@@ -4,7 +4,7 @@
 module Host
 
 import ..HostState
-import ..TestResult
+import ..WorkerTask
 import ..Worker
 import ..PkgRef
 import ..Commit
@@ -13,11 +13,17 @@ import ..WorkerSock
 import ..WorkerInfo
 import ..HOST
 
+import ..WorkerTaskState
+import ..UNTESTED
+import ..PASSED
+import ..FAILURE
+import ..NOT_CONCLUSIVE
+
 rm_if_exists(f) = isfile(f) && rm(f)
 
 # Get's the latest julia's repo and updates list of commits.
 function pull_julia_repo()
-	print("Updating julia repo...")
+	info("Updating julia repo...")
 	
 	const HOME_DIR = HOST.working_dir
 
@@ -58,19 +64,19 @@ function pull_julia_repo()
 	close(file_s)
 	rm_if_exists("commits.txt")
 	rm_if_exists("subjects.txt")
-	println(" done!")
+	info("...done!")
 end
 
 # listens for connections on background
 function schedule_listen_task()
 	@schedule begin
-    	srvr = listen(HOST.port)
+    	srvr = listen(HOST.ip, HOST.port)
     	while true
     		socket = accept(srvr)
         	try
         		handshake(socket)
         	catch e
-        		println("Couldn't accept connection: $e")
+        		warn("Couldn't accept connection: $e")
         		isopen(socket) && close(socket)
         	end
     	end
@@ -85,7 +91,7 @@ function handshake(socket::TCPSocket)
 	worker = deserialize(socket)
 	!isa(worker, WorkerInfo) && throw(ErrorException("Unexpected handshake: Should receive WorkerInfo. Got '$worker'."))
 	push!(HOST.workersocks, WorkerSock(worker, socket))
-	println("New worker connected! Go for it, '$worker.id' !")
+	info("Host: New worker connected! Go for it, '$worker.id' !")
 end
 
 workerscount() = length(HOST.workersocks)
@@ -101,9 +107,8 @@ function start()
 	schedule_listen_task()
 
 	# starting local workers
-	sleep(0.2) # let's go slow...
 	if nprocs() == 1
-		println("No local workers will be created. Use addprocs(n) before running `start_host()` to allow for local workers.")
+		info("No local workers will be created. Use addprocs(n) before running `start_host()` to allow for local workers.")
 	else
 		for ww in procs()
 			ww == 1 && continue
@@ -125,7 +130,7 @@ function start()
 		#i = dispatch()
 
 		show(HOST.results_dict)
-		sleep(120) # seconds
+		sleep(10) # seconds
 	end
 end
 
@@ -178,7 +183,7 @@ function dispatch()
 end
 =#
 
-function update_result(r::TestResult)
+function update_result(r::WorkerTask)
 	HOST.results_dict[r.ref.commit] = [r]
 end
 

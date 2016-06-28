@@ -7,7 +7,7 @@ import ..PkgRef
 import ..Commit
 import ..sha_abbrev
 import ..WorkerInfo
-import ..TestResult
+import ..WorkerTask
 
 const SRC_DIR = dirname(@__FILE__)
 
@@ -23,7 +23,7 @@ function refresh_docker_head_marker(head_sha::AbstractString)
 		write(head_file, head_sha)
 		close(head_file)
 	catch e
-		print("error $e")
+		warn("error $e")
 	end
 end
 
@@ -39,7 +39,7 @@ function refresh_docker_target_marker(target_sha::AbstractString)
 		write(target_file, target)
 		close(target_file)
 	catch e
-		print("error $e")
+		warn("error $e")
 	end
 end
 
@@ -48,7 +48,7 @@ function build_head()
 	try
 		run(`docker build -t julia:head -f $(joinpath(SRC_DIR, "docker", "Dockerfile.head")) $(joinpath(SRC_DIR, "docker"))`)
 	catch e
-		print("error $e")
+		warn("error $e")
 	end
 end
 
@@ -58,37 +58,33 @@ function build_target(pkg::PkgRef)
 		build_head()
 		run(`docker build -t julia:$(sha_abbrev(pkg)) -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
 	catch e
-		print("error $e")
+		warn("error $e")
 	end
 end
 
-function testpkg(pkg::PkgRef)
-	try
-		build_target(pkg)
-		Pkg.clone(pkg.url)
-		Pkg.test(pkg.name)
-		# TODO: record result of versioninfo(io)
-	catch e
-		# TODO : catch STDERR messages, see redirect_stdout, redirect_stderr
-		TestResult(pkg, false, "$e")
-	end
-
-	return TestResult(pkg, true, "")
-end
+#function testpkg(pkg::PkgRef)
+#	try
+#		build_target(pkg)
+#		Pkg.clone(pkg.url)
+#		Pkg.test(pkg.name)
+#		# TODO: record result of versioninfo(io)
+#	catch e
+#		# TODO : catch STDERR messages, see redirect_stdout, redirect_stderr
+#		WorkerTask(pkg, false, "$e")
+#	end
+#
+#	return WorkerTask(pkg, true, "")
+#end
 
 # connects to host and waits for the workload
 function start(my_worker_id::AbstractString, ip, port)
+	wi = WorkerInfo(my_worker_id)
 	sock = connect(ip, port)
-	println("Connected to Host!")
+	info("Worker connected to Host!")
 	try
-		resp = deserialize(sock)
-		resp != :HELLO_WORKER && throw(ErrorException("Unexpected handshake: '$resp'."))
-		serialize(sock, :HELLO_MASTER)
-		resp = deserialize(sock)
-		resp != :WHO_ARE_YOU && throw(ErrorException("Unexpected handshake: '$resp'."))
-		serialize(sock, WorkerInfo(my_worker_id))
+		handshake(sock, wi)
 	catch e
-		println("Couldn't connect to host: $e.")
+		warn("Couldn't connect to host: $e.")
 		isopen(sock) && close(sock)
 	end
 
@@ -100,6 +96,15 @@ function start(my_worker_id::AbstractString, ip, port)
     #   	serialize(c, result)        # <--- send back response
     #   	println("Result was sent to Host!")
     #end
+end
+
+function handshake(sock::TCPSocket, wi)
+	resp = deserialize(sock)
+	resp != :HELLO_WORKER && throw(ErrorException("Unexpected handshake: '$resp'."))
+	serialize(sock, :HELLO_MASTER)
+	resp = deserialize(sock)
+	resp != :WHO_ARE_YOU && throw(ErrorException("Unexpected handshake: '$resp'."))
+	serialize(sock, wi)
 end
 
 end # module
