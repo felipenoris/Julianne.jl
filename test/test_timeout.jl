@@ -1,25 +1,43 @@
+# Tests for @timeout
+event_const_a = 10
+event_fun_x(a) = ( sleep(0.1); 100a )
+event_fun_xa(a) = 100a
+event_fun_y() = ( sleep(0.1); 200 )
+event_fun_w(a, b_) = a + b_
+event_fun_w2(a, b_) = (sleep(0.1); a + b_)
+event_msg = "error_message"
 
-using Base.Test
-
-x(a) = ( sleep(0.5); 100a )
-y() = ( sleep(0.5); 200 )
-
-function z()
-    sleep(0.5)
-    throw(ErrorException("error during z()"))
+function event_fun_z()
+    sleep(0.1)
+    throw(ErrorException("error during event_fun_z()"))
 end
 
-xa(a) = 100a
+@test @timeout(1, event_fun_x(5)) == 100*5
 
-@test @set_timeout 1 x(5) == 100*5
+event_result_r = @timeout 1 event_fun_x(5)
+@test event_result_r == 100*5
 
-r = @set_timeout 1 x(5)
-@test r == 100*5
+@test @timeout(1, event_fun_xa(2)) == 200
+@test_throws TimeoutException @timeout 0.01 event_fun_z()
 
-@test @set_timeout 1 xa(2) == 200
-@test_throws TimeoutException @set_timeout 0.1 z()
+@test_throws TimeoutException @timeout 0.01 event_fun_y()
+@test_throws TimeoutException @timeout 0.01 event_fun_x(1)
+@test_throws ErrorException @timeout 1 event_fun_z() "error"
+@test_throws TimeoutException @timeout 0.01 event_fun_z() "error"
 
-@test_throws TimeoutException @set_timeout 0.1 y()
-@test_throws TimeoutException @set_timeout 0.1 x(1)
-@test_throws ErrorException @set_timeout 1 z() "msg"
-@test_throws TimeoutException @set_timeout 0.1 z() "msg"
+@test @timeout(1, event_fun_w(1, event_const_a)) == 11
+@test @timeout(1, event_fun_w(1, event_const_a), "error") == 11
+@test @timeout(1, event_fun_w2(1, event_const_a)) == event_fun_w(1, event_const_a)
+@test_throws TimeoutException @timeout(0.01, event_fun_w2(1, event_const_a))
+@test_throws TimeoutException @timeout(0.01, event_fun_w2(1, event_const_a), "error " * "message")
+@test_throws TimeoutException @timeout(0.01, event_fun_w2(1, event_const_a), event_msg)
+
+timeout(1) do
+    sleep(0.5)
+    println("hello")
+end
+
+timeout(1) do
+    sleep(2)
+    println("hello")
+end

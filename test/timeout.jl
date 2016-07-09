@@ -8,18 +8,22 @@ type TimeoutException <: Exception
     TimeoutException(msg) = new(msg)
 end
 
-macro set_timeout(timeout_s, exp, msgs...)
-    t_ = eval(timeout_s)
+"""
+    @timeout(t, ex, [msg])
 
-    msg = isempty(msgs) ? exp : msgs[1]
-    if !isempty(msgs) && (isa(msg, Expr) || isa(msg, Symbol))
+Set a timeout of `t` seconds on the execution time of expression `ex`.
+Throws `TimeoutException` with optional error message `msg`
+if the timeout is triggered.
+
+Be aware that the exception raised by the timeout will not abort
+the evaluation of `ex`.
+"""
+macro timeout(timeout_s, ex, msg="")
+    if isa(msg, Expr) || isa(msg, Symbol)
         # message is an expression needing evaluating
         msg = :(Main.Base.string($(esc(msg))))
-    elseif isdefined(Main, :Base) && isdefined(Main.Base, :string)
-        msg = Main.Base.string(msg)
-    else
-        # string() might not be defined during bootstrap
-        msg = :(Main.Base.string($(Expr(:quote,msg))))
+    elseif msg == ""
+        msg = string(ex)
     end
 
     quote
@@ -27,13 +31,38 @@ macro set_timeout(timeout_s, exp, msgs...)
             wt = Condition()
             timeout_occurred = true
 
-            @schedule ( try r = $(esc(exp)); timeout_occurred = false; notify(wt, r); catch e; notify_error(wt, e); end )
-            @schedule ( sleep($t_); notify(wt) )
+            @schedule try
+                r = $(esc(ex))
+                timeout_occurred = false
+                notify(wt, r)
+            catch e
+                notify_error(wt, e)
+            end
+
+            @schedule ( sleep($(esc(timeout_s))); notify(wt) )
 
             result = wait(wt)
             timeout_occurred && throw(TimeoutException($msg))
-
             result
-            end
+        end
     end
+end
+
+function timeout(f, timeout_s, msg="", args...)
+    wt = Condition()
+    timeout_ocurred = true
+
+    @schedule try
+        r = f(args...)
+        timeout_ocurred = false
+        notify(wt, r)
+    catch e
+        notify(wt, e)
+    end
+
+    @schedule ( sleep(timeout_s); notify(wt) )
+
+    result = wait(wt)
+    timeout_ocurred && throw(TimeoutException(msg))
+    result
 end

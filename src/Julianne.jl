@@ -3,7 +3,11 @@ module Julianne
 
 using GitHub
 import Base.IPAddr
+import Base: notify_error
 
+export TimeoutException, timeout
+
+include("timeout.jl")
 include("types.jl")
 include("hostconfig.jl")
 include("worker.jl")
