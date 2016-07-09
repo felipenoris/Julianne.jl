@@ -1,8 +1,9 @@
 
 # centos:7
 
+yum -y install epel-release
 yum -y update
-yum -y install wget cmake git gcc
+yum -y install bzip2 wget cmake git gcc gcc-c++ gcc-gfortran patch libcurl libcurl-devel libgcc m4 openssl openssl098e openssl-devel
 wget https://julialang.s3.amazonaws.com/bin/linux/x64/0.4/julia-0.4.6-linux-x86_64.tar.gz
 tar xf julia-0.4.6-linux-x86_64.tar.gz
 rm -f julia-0.4.6-linux-x86_64.tar.gz
