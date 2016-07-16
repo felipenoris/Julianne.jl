@@ -60,3 +60,9 @@ timeout(1) do
     println("hello")
 end
 =#
+
+@test Julianne.sha_abbrev("abcdefasdfasdfasdf") == "abcdefa"
+
+c = Julianne.Commit("abcdjkljskldfajsdfkl", "ajskldfjkalsjdklfjaklsjdf")
+
+@test Julianne.sha_abbrev(c) == "abcdjkl"

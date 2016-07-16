@@ -1,21 +1,21 @@
 
 # Inside module Host
 
-#=
-type HostState
-    ip::IPAddr
-    port::Int
-    working_dir::AbstractString
-    lastupdate::DateTime
-    commits::Vector{Commit} # Ordered list of commits
-    results::Dict{Commit, Vector{WorkerTaskResponse}} # maps Commit to test status. If it's not there, hasn't been dispached yet for testing. The vector allows for one test for each package.
-    workersocks::Vector{WorkerSock} # registered workers
-    packages::Vector{PkgRef}
-    tail_sha::AbstractString
-
-    HostState(ip, port, working_dir) = new(ip, port, working_dir, now(), Array(AbstractString, 0), Dict{AbstractString, Vector{WorkerTaskResponse}}(), Array(WorkerSock, 0), Array(PkgRef, 0), "")
+function gettestedpkg(c::Commit) # :: Set{PkgRef}
+    r = Set()
+    if haskey(HOST.results, c)
+        responses = HOST.results[c]
+        for wtr in responses
+            push!(r, wtr.request.pkg)
+        end
+    end
+    return r
 end
-=#
+
+function getuntestedpkg(c::Commit)
+    tested = gettestedpkg(c)
+    return setdiff(HOST.packages, tested)
+end
 
 """
     getstatusset(v::Vector{WorkerTaskResponse}) # :: Set{Symbol}
@@ -75,11 +75,12 @@ hasfailure(item) = getstatus(item) ∈ [ :FAILURE, :PENDING_WITH_FAILURE ]
 isunknown(item) = getstatus(item) ∈ [ :UNKNOWN, :PENDING_WITH_UNKNOWN ]
 
 # Send workload to workers
-function dispatch()
+function start_next_test()
     for tc in HOST.commits
         if isdone(tc)
             # This Commit is done testing
             if hasfailure(tc)
+                info("$(sha_abbrev(tc)) is done testing and has FAILURES.")
                 # TODO: This may do bisection in the future...
                 # For now, go test the next Commit in list until we reach the TAIL
                 if istail(tc)
@@ -88,68 +89,61 @@ function dispatch()
                     continue # goes to next Commit
                 end
             else
-                # YAY! This is our new TAIL!
-                settail(tc)
+                if gettail() != tc
+                    # YAY! This is our new TAIL!
+                    info("$(sha_abbrev(tc)) is done testing and PASSED.")
+                    settail(tc)
+                else
+                    info("Nothing to do... Let's get some sleep.")
+                    sleep(10)
+                end
                 return
             end
         else
             # This Commit has pending tests
-            # Let's check if there's some idle worker
-            println("TODO: should dispatch a test for $tc...")
+            info("$(sha_abbrev(tc)) has pending tests.")
+            busy!() # set host as busy
+            # untested packages for this commit
+            un = getuntestedpkg(tc)
+            @sync while !isempty(un)
+                p = shift!(un)
+                ws = pop_worker!() # waits for next available worker
+                @async dispatch(tc, p, ws)
+            end
+            idle!() # set host as idle
             return
         end
     end
 end
 
-function update_result(r::WorkerTaskResponse)
-    HOST.results[r.ref.commit] = [r]
+function pop_worker!(hs::HostState = HOST)
+    while isempty(hs.workers)
+        info("No workers available. Will wait...")
+        wait(hs.workers_c)
+    end
+    pop!(hs.workers)
 end
 
-#=
-function dispatch()
-
-    tc = Condition()
-    @schedule (sleep(120); notify(tc))
-
-    response_channel = Channel()
-
-    nconn = 0
-    conn2 = copy(HOST.connections)
-
-    for c in conn2
-
-        # TODO: calculate execution pipeline, for now tests only the first package
-        #       for all commits in a circular fashion
-        pkgref = copy(STATE.packages[1])
-        pkgref.commit = STATE.commit_list[1]
-
-        nconn += 1 
-        @async try                     # <---- start all remote requests
-            serialize(c, pkgref)
-            put!(response_channel, deserialize(c))
-        catch e
-            put!(response_channel, :ERROR)
-            delete!(CONNECTIONS, c)
-        finally
-            notify(tc)
-        end
-
-        tt = div(tt+1, length(STATE.commit_list))
-    end
-
-    # wait for all responses or the timeout
-    for i in 1:nconn
-        !isready(response_channel) && wait(tc)   # Block wait for a pending response or a timeout
-        !isready(response_channel) && break      # Still not ready, indicates a timeout
-
-        resp = take!(response_channel)
-        if resp != :ERROR
-            update_result(resp)
-        end
-    end
-
-    return tt
-
-    # TODO: update test status with results
+function add_worker!(w::WorkerSock, hs::HostState = HOST)
+    unshift!(hs.workers, w)
+    notify(hs.workers_c)
 end
-=#
+
+function dispatch(c::Commit, p::PkgRef, ws::WorkerSock)
+    try
+        serialize(ws.connection, WorkerTaskRequest(p, c, gettail()))
+        wtr = deserialize(ws.connection) :: WorkerTaskResponse # WorkerTaskResponse
+        update_result(c, wtr)
+        add_worker!(ws)
+    catch e
+        warn("Had problems with worker $ws.")
+        println("$e")
+    end
+end
+
+function update_result(c::Commit, wtr::WorkerTaskResponse)
+    if !haskey(HOST.results, c)
+        HOST.results[c] = Array(WorkerTaskResponse, 0)
+    end
+    push!(HOST.results[c], wtr)
+end

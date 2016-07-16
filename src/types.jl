@@ -1,4 +1,6 @@
 
+sha_abbrev(sha::AbstractString) = sha[1:7]
+
 type Commit
     sha::AbstractString
     subject::AbstractString
@@ -8,6 +10,10 @@ type Commit
     Commit(sha, sub) = Commit(sha, sub, "master") # defaults to julia's master branch
     Commit(sha::AbstractString, sub::AbstractString, br::AbstractString) = new(sha, sub, br)
 end
+
+sha_abbrev(c::Commit) = sha_abbrev(c.sha)
+==(a::Commit, b::Commit) = a.sha == b.sha
+hash(c::Commit, h::UInt = UInt(1)) = hash(c.sha, h)
 
 type WorkerInfo
     id::AbstractString
@@ -65,11 +71,10 @@ type HostState
     tail_sha::AbstractString
     status::Symbol # :IDLE, :BUSY
     idle_c::Condition
-    #busy_c::Condition
+    workers_c::Condition
+    sleep_time::Int # seconds
 
-    HostState(ip, port, working_dir) = new(ip, port, working_dir, now(), Array(AbstractString, 0), Dict{AbstractString, Vector{WorkerTaskResponse}}(), Array(WorkerSock, 0), Array(PkgRef, 0), "", :IDLE, Condition())
+    HostState(ip, port, working_dir, sleep_time) = new(ip, port, working_dir, now(), Array(AbstractString, 0), Dict{AbstractString, Vector{WorkerTaskResponse}}(), Array(WorkerSock, 0), Array(PkgRef, 0), "", :IDLE, Condition(), Condition(), sleep_time)
 end
 
-# TODO: show() methods ...
-sha_abbrev(sha::AbstractString) = sha[1:7]
-sha_abbrev(c::Commit) = sha_abbrev(c.sha)
+gettail(hs::HostState) = Commit(hs.tail_sha, hs.commits[end].subject)

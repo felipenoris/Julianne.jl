@@ -16,10 +16,11 @@ import ..WorkerInfo
 import ..HOST
 import ..TimeoutException
 import ..timeout
+import ..sha_abbrev
 
 rm_if_exists(f) = isfile(f) && rm(f)
 
-wait_for_idle(h::HostState = HOST) = wait(h.status_c)
+wait_host(h::HostState = HOST) = wait(h.idle_c)
 isidle(h::HostState = HOST) = h.status == :IDLE
 isbusy(h::HostState = HOST) = h.status == :BUSY
 
@@ -38,13 +39,11 @@ end
 function pull_julia_repo()
     info("Updating julia repo...")
     
-    const HOME_DIR = HOST.working_dir
-
-    if !isdir(HOME_DIR)
-        throw(ErrorException("home dir not found: $HOME_DIR"))
+    if !isdir(HOST.working_dir)
+        throw(ErrorException("Working directory not found: $(HOST.working_dir)"))
     end
 
-    cd(HOME_DIR)
+    cd(HOST.working_dir)
 
     if !isdir("julia")
         # clone repo
@@ -103,8 +102,8 @@ function handshake(socket::TCPSocket)
     serialize(socket, :WHO_ARE_YOU)
     worker = deserialize(socket)
     !isa(worker, WorkerInfo) && throw(ErrorException("Unexpected handshake: Should receive WorkerInfo. Got '$worker'."))
-    unshift!(HOST.workers, WorkerSock(worker, socket))
-    info("Host: New worker connected! Go for it, '$worker.id' !")
+    add_worker!(WorkerSock(worker, socket))
+    info("Host: New worker connected! Go for it, '$(worker.id)' !")
 end
 
 function start(ip::IPAddr, port::Int, working_dir="")
@@ -125,6 +124,10 @@ function checkhostconfig()
     if isempty(HOST.packages)
         throw(ErrorException("No packages to be tested. Will stop the HOST."))
     end
+
+    if !isdir(HOST.working_dir)
+        throw(ErrorException("Working directory not found: $(HOST.working_dir)"))
+    end
 end
 
 # Set new TAIL for the HOST
@@ -135,7 +138,11 @@ end
 
 istail(c::Commit) = HOST.tail_sha == c.sha
 
+gettail() = Commit(HOST.tail_sha, "")
+
 function start()
+    # Checks for Host configuration consistency
+    checkhostconfig()
 
     schedule_listen_task()
 
@@ -149,24 +156,21 @@ function start()
         end
     end
 
-    # Checks for Host configuration consistency
-    checkhostconfig()
-
+    i = 1
     # main loop for server work
-    while true
-        while workerscount() == 0
-            println("No workers registered. Will wait...")
-            sleep(5)
-        end
-
+    @async while true
+        
         pull_julia_repo()
-
+        info("Starting iteration $i...")
         # dispatch workload for workers
-        dispatch()
+        start_next_test()
 
+        info("Test iteration $i results:")
         show(HOST.results)
-        sleep(10) # seconds
+        i += 1
     end
+
+    yield()
 end
 
 include("hostlogic.jl")

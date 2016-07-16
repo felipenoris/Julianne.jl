@@ -3,7 +3,7 @@ module Julianne
 
 using GitHub
 import Base.IPAddr
-import Base: notify_error
+import Base: notify_error, hash, ==
 
 export TimeoutException, timeout
 

@@ -47,7 +47,7 @@ function build_target(target::Commit)
     end
 end
 
-#function testpkg(pkg::PkgRef)
+#function testpkg(request::WorkerTaskRequest) # :: WorkerTaskResponse
 #   try
 #       build_target(pkg)
 #       Pkg.clone(pkg.url)
@@ -73,14 +73,14 @@ function start(my_worker_id::AbstractString, ip, port)
         isopen(sock) && close(sock)
     end
 
-    #while true
-    #       pkgref = deserialize(c)    # <--- Block wait for a request
-    #       println("going to test $(pkgref.name)")
-    #       result = testpkg(pkgref)
-    #       println("Received request for $(pkgref.name). Response $result.")
-    #       serialize(c, result)        # <--- send back response
-    #       println("Result was sent to Host!")
-    #end
+    while true
+        request = deserialize(sock) :: WorkerTaskRequest
+        info("worker $my_worker_id going to test $(request.pkg.name).")
+        sleep(10 + 5*rand()) # TODO
+        response = WorkerTaskResponse(request, :FAILURE, "", VERSION, wi)
+        serialize(sock, response)
+        info("worker $my_worker_id finished tests for $(request.pkg.name).")
+    end
 end
 
 function handshake(sock::TCPSocket, wi)
