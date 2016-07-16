@@ -1,4 +1,4 @@
-FROM julia:head
+FROM julia:tail
 
 MAINTAINER Julianne <juliannebot@gmail.com>
 

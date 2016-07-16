@@ -78,9 +78,9 @@ RUN yum -y install libedit-devel libffi-devel swig python-devel
 
 RUN git clone https://github.com/JuliaLang/julia.git
 
-ADD HEAD HEAD
+ADD TAIL TAIL
 
-RUN cd julia && git pull && git checkout $(cat ../HEAD)
+RUN cd julia && git pull && git checkout $(cat ../TAIL)
 
 RUN cd julia && make -j"$(nproc --all)"
 
