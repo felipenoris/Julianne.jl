@@ -40,26 +40,34 @@ end
 # builds the target commit for testing
 function build_target(target::Commit)
     try
-        build_tail()
         run(`docker build -t julia:$(sha_abbrev(target)) -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
     catch e
         warn("error $e")
     end
 end
 
-#function testpkg(request::WorkerTaskRequest) # :: WorkerTaskResponse
-#   try
-#       build_target(pkg)
-#       Pkg.clone(pkg.url)
-#       Pkg.test(pkg.name)
-#       # TODO: record result of versioninfo(io)
-#   catch e
-#       # TODO : catch STDERR messages, see redirect_stdout, redirect_stderr
-#       WorkerTask(pkg, false, "$e")
-#   end
-#
-#   return WorkerTask(pkg, true, "")
-#end
+function run_container(c::Commit, pkg::PkgRef)
+    try
+        # docker run -it --rm julia:beab3b6 ./julia/julia -e 'println("hello")'
+        output = string(hash(rand())) * ".log" # random generated filename for log output
+        run(`docker run -it --rm julia:$(sha_abbrev(c)) ./julia/julia -e ' (Pkg.clone("$(pkg.url)") ; Pkg.test("$(pkg.name)") )' > $(output)`)
+    catch e
+        warn("error $e")
+    end
+end
+
+function testpkg(request::WorkerTaskRequest) # :: WorkerTaskResponse
+   try
+       build_tail(request.tail)
+       build_target(request.target)
+       run_container(request.target, request.pkg)
+   catch e
+       # TODO : catch STDERR messages, see redirect_stdout, redirect_stderr
+       WorkerTask(pkg, false, "$e")
+   end
+
+   return WorkerTask(pkg, true, "")
+end
 
 # connects to host and waits for the workload
 function start(my_worker_id::AbstractString, ip, port)
