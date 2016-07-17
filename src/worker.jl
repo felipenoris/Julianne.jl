@@ -31,6 +31,7 @@ end
 # builds just the tail
 function build_tail(tail::Commit)
     try
+        refresh_docker_marker("TAIL", tail.sha)
         run(`docker build -t julia:$(sha_abbrev(tail)) -f $(joinpath(SRC_DIR, "docker", "Dockerfile.tail")) $(joinpath(SRC_DIR, "docker"))`)
     catch e
         warn("error $e")
@@ -40,6 +41,7 @@ end
 # builds the target commit for testing
 function build_target(target::Commit)
     try
+        refresh_docker_marker("TARGET", target.sha)
         run(`docker build -t julia:$(sha_abbrev(target)) -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
     catch e
         warn("error $e")
