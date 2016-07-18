@@ -85,11 +85,13 @@ function schedule_listen_task()
         srvr = listen(HOST.ip, HOST.port)
         while true
             socket = accept(srvr)
-            try
-                handshake(socket)
-            catch e
-                warn("Couldn't accept connection: $e")
-                isopen(socket) && close(socket)
+            @async begin
+                try
+                    handshake(socket)
+                catch e
+                    warn("Couldn't accept connection: $e")
+                    isopen(socket) && close(socket)
+                end
             end
         end
     end
