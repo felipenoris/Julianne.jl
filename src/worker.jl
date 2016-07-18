@@ -48,6 +48,25 @@ function build_target(target::Commit)
     end
 end
 
+# Build docker images
+function build(tail::Commit, target::Commit)
+    try
+        tail_sha_abv = sha_abbrev(tail)
+        target_sha_abv = sha_abbrev(target)
+        
+        info("Building julia docker image for tail $tail_sha_abv...")
+        refresh_docker_marker("TAIL", tail.sha)
+        run(`docker build -t julia:$tail_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.tail")) $(joinpath(SRC_DIR, "docker"))`)
+        info("Done building julia docker image for tail $tail_sha_abv.")
+        
+        info("Building julia docker image for target $target_sha_abv...")
+        refresh_docker_marker("TARGET", target.sha)
+        info("Done building julia docker image for target $target_sha_abv.")
+    catch e
+        warn("Error building julia docker images: $e.")
+    end
+end
+
 function run_container(c::Commit, pkg::PkgRef)
     try
         # docker run -it --rm julia:beab3b6 ./julia/julia -e 'println("hello")'
@@ -60,8 +79,7 @@ end
 
 function testpkg(request::WorkerTaskRequest) # :: WorkerTaskResponse
    try
-       build_tail(request.tail)
-       build_target(request.target)
+       build(request.tail, request.target)
        run_container(request.target, request.pkg)
    catch e
        # TODO : catch STDERR messages, see redirect_stdout, redirect_stderr

@@ -76,7 +76,7 @@ target = Julianne.Commit("2d973d0a276b644acb18784a4bd7464ec14bdb53", "Fix Dict k
 tail = Julianne.Commit("4b0c60f2edff120569d797fcb63c99bfc83e1928", "Fix #17105, @ inferred with kwargs")
 
 request_pass = Julianne.WorkerTaskRequest(passing_pkg, target, tail)
-request_fail = Julianne.WorkerTaskRequest(failing_pkg, target, fail)
+request_fail = Julianne.WorkerTaskRequest(failing_pkg, target, tail)
 
 response_pass = Julianne.Worker.testpkg(request_pass)
 response_fail = Julianne.Worker.testpkg(response_fail)

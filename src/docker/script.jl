@@ -1,0 +1,10 @@
+
+f = open("Dockerfile.target")
+l = readlines(f)
+close(f)
+l[1] = replace(l[1], "tail", "sha")
+println("$(l[1])")
+f = open("Dockerfile.target", "w")
+write(f, l)
+flush(f)
+close(f)
