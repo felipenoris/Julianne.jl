@@ -19,21 +19,20 @@ import ..timeout
 import ..sha_abbrev
 
 rm_if_exists(f) = isfile(f) && rm(f)
-
+istail(c::Commit) = HOST.tail_sha == c.sha
+gettail() = Commit(HOST.tail_sha, "")
 wait_host(h::HostState = HOST) = wait(h.idle_c)
 isidle(h::HostState = HOST) = h.status == :IDLE
 isbusy(h::HostState = HOST) = h.status == :BUSY
-
 workerscount(h::HostState = HOST) = length(h.workers)
-
-function busy!(h::HostState = HOST)
-    h.status = :BUSY
-end
-
-function idle!(h::HostState = HOST)
-    h.status = :IDLE
-    notify(h.idle_c)
-end
+getstatus(wtr::WorkerTaskResponse) = wtr.status
+getstatus(sym::Symbol) = sym
+ispending(item) = getstatus(item) ∈ [ :UNTESTED, :PENDING, :PENDING_WITH_FAILURE, :PENDING_WITH_UNKNOWN ]
+isdone(item) = !ispending(item)
+hasfailure(item) = getstatus(item) ∈ [ :FAILURE, :PENDING_WITH_FAILURE ]
+isunknown(item) = getstatus(item) ∈ [ :UNKNOWN, :PENDING_WITH_UNKNOWN ]
+busy!(h::HostState = HOST) = (h.status = :BUSY)
+idle!(h::HostState = HOST) = (h.status = :IDLE; notify(h.idle_c))
 
 # Get's the latest julia's repo and updates list of commits.
 function pull_julia_repo()
@@ -138,10 +137,6 @@ function settail(c::Commit)
     info("Ladies and Gentlemen: our new TAIL is $(sha_abbrev(c))!")
 end
 
-istail(c::Commit) = HOST.tail_sha == c.sha
-
-gettail() = Commit(HOST.tail_sha, "")
-
 function start()
     # Checks for Host configuration consistency
     checkhostconfig()
@@ -239,14 +234,6 @@ function getstatus(c::Commit) # :: Symbol
         end
     end
 end
-
-getstatus(wtr::WorkerTaskResponse) = wtr.status
-getstatus(sym::Symbol) = sym
-
-ispending(item) = getstatus(item) ∈ [ :UNTESTED, :PENDING, :PENDING_WITH_FAILURE, :PENDING_WITH_UNKNOWN ]
-isdone(item) = !ispending(item)
-hasfailure(item) = getstatus(item) ∈ [ :FAILURE, :PENDING_WITH_FAILURE ]
-isunknown(item) = getstatus(item) ∈ [ :UNKNOWN, :PENDING_WITH_UNKNOWN ]
 
 # Send workload to workers
 function start_next_test()
