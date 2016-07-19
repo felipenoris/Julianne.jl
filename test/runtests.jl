@@ -68,7 +68,6 @@ c = Julianne.Commit("abcdjkljskldfajsdfkl", "ajskldfjkalsjdklfjaklsjdf")
 @test Julianne.sha_abbrev(c) == "abcdjkl"
 
 # Worker
-
 passing_pkg = Julianne.PkgRef("PassingPkg", "https://github.com/juliannebot/PassingPkg.jl.git")
 failing_pkg = Julianne.PkgRef("FailingPkg", "https://github.com/juliannebot/FailingPkg.jl.git")
 
@@ -81,4 +80,4 @@ request_fail = Julianne.WorkerTaskRequest(failing_pkg, target, tail)
 wi = Julianne.WorkerInfo("Test Suite")
 
 response_pass = Julianne.Worker.testpkg(wi, request_pass)
-response_fail = Julianne.Worker.testpkg(wi, response_fail)
+response_fail = Julianne.Worker.testpkg(wi, request_fail)

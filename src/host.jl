@@ -1,54 +1,42 @@
 
 # host routines
 
-module Host
-
 import Base.IPAddr
-import ..HostState
-import ..WorkerTaskRequest
-import ..WorkerTaskResponse
-import ..Worker
-import ..PkgRef
-import ..Commit
-import ..Worker
-import ..WorkerSock
-import ..WorkerInfo
-import ..HOST
-import ..TimeoutException
-import ..timeout
-import ..sha_abbrev
 
 rm_if_exists(f) = isfile(f) && rm(f)
 istail(c::Commit) = HOST.tail_sha == c.sha
 gettail() = Commit(HOST.tail_sha, "")
-wait_host(h::HostState = HOST) = wait(h.idle_c)
-isidle(h::HostState = HOST) = h.status == :IDLE
-isbusy(h::HostState = HOST) = h.status == :BUSY
-workerscount(h::HostState = HOST) = length(h.workers)
+wait_host() = wait(HOST.idle_c)
+isidle() = HOST.status == :IDLE
+isbusy() = HOST.status == :BUSY
+workerscount() = length(HOST.workers)
 getstatus(wtr::WorkerTaskResponse) = wtr.status
 getstatus(sym::Symbol) = sym
 ispending(item) = getstatus(item) ∈ [ :UNTESTED, :PENDING, :PENDING_WITH_FAILURE, :PENDING_WITH_UNKNOWN ]
 isdone(item) = !ispending(item)
 hasfailure(item) = getstatus(item) ∈ [ :FAILURE, :PENDING_WITH_FAILURE ]
 isunknown(item) = getstatus(item) ∈ [ :UNKNOWN, :PENDING_WITH_UNKNOWN ]
-busy!(h::HostState = HOST) = (h.status = :BUSY)
-idle!(h::HostState = HOST) = (h.status = :IDLE; notify(h.idle_c))
+busy!() = (HOST.status = :BUSY)
+idle!() = (HOST.status = :IDLE; notify(HOST.idle_c))
 
 # Get's the latest julia's repo and updates list of commits.
 function pull_julia_repo()
     info("Updating julia repo...")
-    
+
     if !isdir(HOST.working_dir)
         throw(ErrorException("Working directory not found: $(HOST.working_dir)"))
     end
-
     cd(HOST.working_dir)
 
-    if !isdir("julia")
-        # clone repo
+    # Clone julia repo if it's not found on HOST.working_dir
+    if !isdir("julia") 
+        info("Clonning julia repo at $(HOST.working_dir)")
         run(`git clone https://github.com/JuliaLang/julia.git`)
+    else
+        julia_dir = joinpath(HOST.working_dir, "julia")
+        info("Found julia repo at $julia_dir")
     end
-
+    
     rm_if_exists("commits.txt")
     rm_if_exists("subjects.txt")
     cd("julia")
@@ -117,7 +105,6 @@ function start(working_dir="")
     if working_dir != "" 
         HOST.working_dir = working_dir
     end
-
     start()
 end
 
@@ -140,10 +127,9 @@ end
 function start()
     # Checks for Host configuration consistency
     checkhostconfig()
-
     schedule_listen_task()
 
-    # starting local workers
+    # start local workers
     if nprocs() == 1
         info("No local workers will be created. Use addprocs(n) before running `start_host()` to allow for local workers.")
     else
@@ -156,17 +142,14 @@ function start()
     i = 1
     # main loop for server work
     @async while true
-        
         pull_julia_repo()
         info("Starting iteration $i...")
-        # dispatch workload for workers
+        # dispatch workload
         start_next_test()
-
         info("Test iteration $i results:")
         show(HOST.results)
         i += 1
     end
-
     yield()
 end
 
@@ -314,5 +297,3 @@ end
 # TODO: post results
 
 # TODO: update jpeg for results that readme.md shows
-
-end # module

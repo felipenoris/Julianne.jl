@@ -4,6 +4,8 @@ Pkg.update()
 Pkg.clone("https://github.com/juliannebot/PassingPkg.jl.git")
 Pkg.clone("https://github.com/juliannebot/FailingPkg.jl.git")
 
+# TODO: generate this file during worker's handshake
+
 #=
 Pkg.add("BusinessDays")
 Pkg.add("Calculus")
