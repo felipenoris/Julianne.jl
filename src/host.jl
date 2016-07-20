@@ -14,7 +14,7 @@ getstatus(wtr::WorkerTaskResponse) = wtr.status
 getstatus(sym::Symbol) = sym
 ispending(item) = getstatus(item) ∈ [ :UNTESTED, :PENDING, :PENDING_WITH_FAILURE, :PENDING_WITH_UNKNOWN ]
 isdone(item) = !ispending(item)
-hasfailure(item) = getstatus(item) ∈ [ :FAILURE, :PENDING_WITH_FAILURE ]
+hasfailure(item) = getstatus(item) ∈ [ :FAILED, :PENDING_WITH_FAILURE ]
 isunknown(item) = getstatus(item) ∈ [ :UNKNOWN, :PENDING_WITH_UNKNOWN ]
 busy!() = (HOST.status = :BUSY)
 idle!() = (HOST.status = :IDLE; notify(HOST.idle_c))
@@ -185,7 +185,7 @@ end
 """
     getstatus(c::Commit) :: Symbol
 
-:PASSED, :FAILURE, :UNKNOWN
+:PASSED, :FAILED, :UNKNOWN
 :UNTESTED, :PENDING, :PENDING_WITH_FAILURE, :PENDING_WITH_UNKNOWN
 """
 function getstatus(c::Commit) # :: Symbol
@@ -199,7 +199,7 @@ function getstatus(c::Commit) # :: Symbol
     
     if length(responses) != length(HOST.packages)
         # there are pending tests
-        if :FAILURE ∈ status_set
+        if :FAILED ∈ status_set
             return :PENDING_WITH_FAILURE
         elseif :UNKNOWN ∈ status_set
             return :PENDING_WITH_UNKNOWN
@@ -208,8 +208,8 @@ function getstatus(c::Commit) # :: Symbol
         end
     else
         # all tests are done
-        if :FAILURE ∈ status_set
-            return :FAILURE
+        if :FAILED ∈ status_set
+            return :FAILED
         elseif :UNKNOWN ∈ status_set
             return :UNKNOWN
         else
