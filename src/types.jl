@@ -43,12 +43,14 @@ immutable PkgRef
     url::AbstractString
 
     PkgRef(name, url) = new(name, url)
+    PkgRef(name) = PkgRef(name, "")
 end
 
 type WorkerTaskRequest
-    pkg::PkgRef
+    pkg::PkgRef # pkg to be tested
     target::Commit # Julia's commit sha to be tested
     tail::Commit # Oldest known commit which all tests pass
+    pkg_list::Vector{PkgRef} # Full list of packages, used to build the docker image
 end
 
 type WorkerTaskResponse

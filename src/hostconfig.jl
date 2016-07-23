@@ -11,5 +11,4 @@ push!(HOST.packages, PkgRef("PassingPkg", "https://github.com/juliannebot/Passin
 push!(HOST.packages, PkgRef("FailingPkg", "https://github.com/juliannebot/FailingPkg.jl.git"))
 
 # Set last known Commit which all tests pass
-#HOST.tail_sha = "e62b204599418164e8a3cbcf88dc6ff556c3ad83"
-HOST.tail_sha = "4b0c60f2edff120569d797fcb63c99bfc83e1928"
+HOST.tail_sha = "11a34aac2d9b859cf5266f5571797e41748e10e0"

@@ -42,17 +42,13 @@ end
 
 # updates HEAD and TARGET files used by the Dockerfile
 function update_docker_marker(marker_name::AbstractString, sha::AbstractString)
-    try
-        marker_filepath = joinpath(SRC_DIR, "docker", marker_name)
-        if isfile(marker_filepath)
-            rm(marker_filepath)
-        end
-        marker_file = open(marker_filepath, "w")
-        write(marker_file, sha)
-        close(marker_file)
-    catch e
-        warn("error $e")
+    marker_filepath = joinpath(SRC_DIR, "docker", marker_name)
+    if isfile(marker_filepath)
+        rm(marker_filepath)
     end
+    marker_file = open(marker_filepath, "w")
+    write(marker_file, sha)
+    close(marker_file)
 end
 
 # Build docker images
@@ -119,6 +115,7 @@ function run_container!(response::WorkerTaskResponse, c::Commit, pkg::PkgRef)
 end
 
 function testpkg(wi::WorkerInfo, request::WorkerTaskRequest) # :: WorkerTaskResponse
+    gen_julia_pkgs_file(request)
     response = WorkerTaskResponse(request, :UNTESTED, "", VERSION, wi) # TODO: change VERSION to Pkg version
     try
         build(request.tail, request.target)
@@ -172,6 +169,29 @@ function handshake(sock::TCPSocket, wi)
     resp = deserialize(sock)
     resp != :WHO_ARE_YOU && throw(ErrorException("Unexpected handshake: '$resp'."))
     serialize(sock, wi)
+end
+
+# Generates julia-packages.jl file referenced by the Dockerfile
+function gen_julia_pkgs_file(r::WorkerTaskRequest)
+    av = Pkg.available()
+
+    pkgs_filepath = joinpath(SRC_DIR, "docker", "julia-packages.jl")
+    if isfile(pkgs_filepath)
+        rm(pkgs_filepath)
+    end
+    pkgs_file = open(pkgs_filepath, "w")
+    write(pkgs_file, "Pkg.update()\n")
+
+    for p in r.pkg_list
+        #p is PkgRef
+        if p.name in av
+            write(pkgs_file, "Pkg.add(\"$(p.name)\")\n")
+        else
+            write(pkgs_file, "Pkg.clone(\"$(p.url)\")\n")
+        end
+    end
+    flush(pkgs_file)
+    close(pkgs_file)
 end
 
 end # module

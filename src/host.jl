@@ -275,7 +275,7 @@ end
 
 function dispatch(c::Commit, p::PkgRef, ws::WorkerSock)
     try
-        serialize(ws.connection, WorkerTaskRequest(p, c, gettail()))
+        serialize(ws.connection, WorkerTaskRequest(p, c, gettail()), HOST.packages)
         wtr = deserialize(ws.connection) :: WorkerTaskResponse # WorkerTaskResponse
         update_result(c, wtr)
         add_worker!(ws)
