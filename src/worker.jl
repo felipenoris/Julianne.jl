@@ -56,16 +56,22 @@ function update_docker_marker(marker_name::AbstractString, sha::AbstractString)
 end
 
 # Build docker images
-function build(tail::Commit, target::Commit)
+function build(tail::Commit, target::Commit; nocache=false)
     const tail_sha_abv = sha_abbrev(tail)
     const target_sha_abv = sha_abbrev(target)
     const filepath_docker_tail = joinpath(SRC_DIR, "docker", "Dockerfile.tail")
     const filepath_docker_target = joinpath(SRC_DIR, "docker", "Dockerfile.target")
+
     try
         # Build tail
         info("Building julia docker image for tail $tail_sha_abv...")
         update_docker_marker("TAIL", tail.sha)
-        run(`docker build -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
+
+        if nocache
+            run(`docker build --no-cache -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
+        else
+            run(`docker build -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
+        end
         info("Done building julia docker image for tail $tail_sha_abv.")
 
         # Build target
@@ -74,9 +80,6 @@ function build(tail::Commit, target::Commit)
         _replace_on_1st_line(filepath_docker_target, "tail", tail_sha_abv) # replace image name inside Dockerfile.target
         run(`docker build -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
         info("Done building julia docker image for target $target_sha_abv.")
-
-    catch e
-        warn("Error building julia docker images: $e.")
     finally
         # Put it back, so it will work next time
         _replace_on_1st_line(filepath_docker_target, tail_sha_abv, "tail")
@@ -119,6 +122,18 @@ function testpkg(wi::WorkerInfo, request::WorkerTaskRequest) # :: WorkerTaskResp
     response = WorkerTaskResponse(request, :UNTESTED, "", VERSION, wi) # TODO: change VERSION to Pkg version
     try
         build(request.tail, request.target)
+    catch e
+        # Will try to build with nocache
+        try
+            build(request.tail, request.target; nocache=true)
+        catch e
+            response.status = :UNKNOWN
+            response.error_message = "Error building docker image: $e"
+            return response
+        end
+    end    
+
+    try
         run_container!(response, request.target, request.pkg)
     catch e
         response.status = :UNKNOWN
