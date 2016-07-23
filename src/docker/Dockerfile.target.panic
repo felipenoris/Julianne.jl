@@ -1,0 +1,13 @@
+FROM julia:tail
+
+MAINTAINER Julianne <juliannebot@gmail.com>
+
+WORKDIR /root
+
+ENV JULIA_PKGDIR /usr/local/julia/share/julia/site
+
+ADD TARGET TARGET
+
+RUN cd julia && git checkout master && git pull && git checkout $(cat ../TARGET) && make cleanall && make distcleanall && git reset --hard && git clean -x -f -d && make -j"$(nproc --all)"
+
+RUN ./julia/julia -e 'Pkg.update()'

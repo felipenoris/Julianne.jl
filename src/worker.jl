@@ -52,7 +52,7 @@ function update_docker_marker(marker_name::AbstractString, sha::AbstractString)
 end
 
 # Build docker images
-function build(tail::Commit, target::Commit; nocache=false)
+function build(tail::Commit, target::Commit)
     const tail_sha_abv = sha_abbrev(tail)
     const target_sha_abv = sha_abbrev(target)
     const filepath_docker_tail = joinpath(SRC_DIR, "docker", "Dockerfile.tail")
@@ -63,10 +63,12 @@ function build(tail::Commit, target::Commit; nocache=false)
         info("Building julia docker image for tail $tail_sha_abv...")
         update_docker_marker("TAIL", tail.sha)
 
-        if nocache
-            run(`docker build --no-cache -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
-        else
+        try
             run(`docker build -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
+        catch e
+            # Will to to build with --no-cache enabled
+            warn("Got error trying to build tail. Will try to build with no cache: $e")
+            run(`docker build --no-cache -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
         end
         info("Done building julia docker image for tail $tail_sha_abv.")
 
@@ -74,7 +76,14 @@ function build(tail::Commit, target::Commit; nocache=false)
         info("Building julia docker image for target $target_sha_abv...")
         update_docker_marker("TARGET", target.sha)
         _replace_on_1st_line(filepath_docker_target, "tail", tail_sha_abv) # replace image name inside Dockerfile.target
-        run(`docker build -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
+        
+        try
+            run(`docker build -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
+        catch e
+            # Will try to build in panic mode
+            warn("Got error trying to build target. Will try to build in panic mode: $e")
+            run(`docker build --no-cache -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target.panic")) $(joinpath(SRC_DIR, "docker"))`)
+        end
         info("Done building julia docker image for target $target_sha_abv.")
     finally
         # Put it back, so it will work next time
@@ -120,14 +129,9 @@ function testpkg(wi::WorkerInfo, request::WorkerTaskRequest) # :: WorkerTaskResp
     try
         build(request.tail, request.target)
     catch e
-        # Will try to build with nocache
-        try
-            build(request.tail, request.target; nocache=true)
-        catch e
-            response.status = :UNKNOWN
-            response.error_message = "Error building docker image: $e"
-            return response
-        end
+        response.status = :UNKNOWN
+        response.error_message = "Error building docker image: $e"
+        return response
     end    
 
     try
