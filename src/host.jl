@@ -55,7 +55,7 @@ function pull_julia_repo()
         c = chomp(readline(file_c))
         s = chomp(readline(file_s))
 
-        println("$c : $s")
+        println("$(sha_abbrev(c)) : $s")
         push!(HOST.commits, Commit(c, s))
     end
 
