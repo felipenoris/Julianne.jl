@@ -60,20 +60,20 @@ function build(tail::Commit, target::Commit)
 
     try
         # Build tail
-        info("Building julia docker image for tail $tail_sha_abv...")
+        @info("Building julia docker image for tail $tail_sha_abv...")
         update_docker_marker("TAIL", tail.sha)
 
         try
             run(`docker build -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
         catch e
             # Will to to build with --no-cache enabled
-            warn("Got error trying to build tail. Will try to build with no cache: $e")
+            @warn("Got error trying to build tail. Will try to build with no cache: $e")
             run(`docker build --no-cache -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
         end
-        info("Done building julia docker image for tail $tail_sha_abv.")
+        @info("Done building julia docker image for tail $tail_sha_abv.")
 
         # Build target
-        info("Building julia docker image for target $target_sha_abv...")
+        @info("Building julia docker image for target $target_sha_abv...")
         update_docker_marker("TARGET", target.sha)
         _replace_on_1st_line(filepath_docker_target, "tail", tail_sha_abv) # replace image name inside Dockerfile.target
         
@@ -81,10 +81,10 @@ function build(tail::Commit, target::Commit)
             run(`docker build -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
         catch e
             # Will try to build in panic mode
-            warn("Got error trying to build target. Will try to build in panic mode: $e")
+            @warn("Got error trying to build target. Will try to build in panic mode: $e")
             run(`docker build --no-cache -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target.panic")) $(joinpath(SRC_DIR, "docker"))`)
         end
-        info("Done building julia docker image for target $target_sha_abv.")
+        @info("Done building julia docker image for target $target_sha_abv.")
     finally
         # Put it back, so it will work next time
         _replace_on_1st_line(filepath_docker_target, tail_sha_abv, "tail")
@@ -98,11 +98,11 @@ function run_container!(response::WorkerTaskResponse, c::Commit, pkg::PkgRef)
     const image = "julia:$(sha_abbrev(c))"
 
     try 
-        info("Going to test $(pkg.name) at $(image)")
+        @info("Going to test $(pkg.name) at $(image)")
         cmd = `docker run --rm $image ./julia/julia -e (Pkg.update();Pkg.test(\"$(pkg.name)\"))`
         println(cmd)
         run(pipeline(cmd, stdout=output_file, stderr=err_file))
-        info("Test finished for $(pkg.name)")
+        @info("Test finished for $(pkg.name)")
 
         # Did tests pass?
         if _has_string(err_file, "$(pkg.name) tests passed")
@@ -112,7 +112,7 @@ function run_container!(response::WorkerTaskResponse, c::Commit, pkg::PkgRef)
             # TODO: set response.error_message
         end
     catch e
-        warn("error $e")
+        @warn("error $e")
         if isfile(output_file) && isfile(err_file)
             response.status = :FAILED
             # TODO: set response.error_message
@@ -139,7 +139,7 @@ function testpkg(wi::WorkerInfo, request::WorkerTaskRequest) # :: WorkerTaskResp
     catch e
         response.status = :UNKNOWN
         response.error_message = "$e"
-        warn("Error running testpkg: $e")
+        @warn("Error running testpkg: $e")
     finally
         return response
     end
@@ -149,20 +149,20 @@ end
 function start(my_worker_id::AbstractString, ip, port)
     wi = WorkerInfo(my_worker_id)
     sock = connect(ip, port)
-    info("Worker connected to Host!")
+    @info("Worker connected to Host!")
     try
         handshake(sock, wi)
     catch e
-        warn("Couldn't connect to host: $e.")
+        @warn("Couldn't connect to host: $e.")
         isopen(sock) && close(sock)
     end
 
     while true
         request = deserialize(sock) :: WorkerTaskRequest
-        info("worker $my_worker_id going to test $(request.pkg.name).")
+        @info("worker $my_worker_id going to test $(request.pkg.name).")
         response = testpkg(wi, request)
         serialize(sock, response)
-        info("worker $my_worker_id finished tests for $(request.pkg.name).")
+        @info("worker $my_worker_id finished tests for $(request.pkg.name).")
     end
 end
 
