@@ -80,3 +80,18 @@ type HostState
 end
 
 gettail(hs::HostState) = Commit(hs.tail_sha, hs.commits[end].subject)
+
+function report_str(h::HostState) # :: String
+    r = """
+    Tail: $(sha_abbrev(h.tail_sha))
+    # of available workers: $(length(h.workers))
+    """
+
+    for c in h.commits
+        r = r * "$(sha_abbrev(c)) : $(getstatus(c))"
+        if c.sha == tail_sha
+            break
+        end
+    end
+    r
+end
