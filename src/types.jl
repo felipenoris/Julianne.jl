@@ -83,7 +83,7 @@ gettail(hs::HostState) = Commit(hs.tail_sha, hs.commits[end].subject)
 
 function report_str(h::HostState) # :: String
     r = """
-    Tail: $(sha_abbrev(h.tail_sha))
+    Current tail: $(h.tail_sha)
     # of available workers: $(length(h.workers))
     """
 
