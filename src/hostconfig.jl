@@ -25,4 +25,4 @@ push!(HOST.packages, PkgRef("StatsBase"))
 
 
 # Set last known Commit which all tests pass
-HOST.tail_sha = "a8d796355ac99750e7e192e4e31021e1da32cbe9"
+HOST.tail_sha = "0030eec2f332f353e6890ca289ac2aca55532dde"
