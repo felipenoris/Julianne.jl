@@ -11,6 +11,10 @@ import ..WorkerTaskRequest
 import ..WorkerTaskResponse
 import ..rm_if_exists
 
+using Logging
+
+@Logging.configure(filename="julianne_worker.log", level=INFO)
+
 const SRC_DIR = dirname(@__FILE__)
 
 # Utility function for method build
