@@ -177,7 +177,7 @@ function start()
 
     i = 1
     # main loop for server work
-    @async while true
+    while true
         pull_julia_repo()
         @info("Starting iteration $i...")
         # dispatch workload
