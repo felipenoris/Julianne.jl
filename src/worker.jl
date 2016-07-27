@@ -67,11 +67,15 @@ function build(tail::Commit, target::Commit)
         update_docker_marker("TAIL", tail.sha)
 
         try
-            run(`docker build -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
+            cmd_tail = `docker build -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`
+            @info(cmd_tail)
+            run(cmd_tail)
         catch e
             # Will to to build with --no-cache enabled
             @warn("Got error trying to build tail. Will try to build with no cache: $e")
-            run(`docker build --no-cache -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`)
+            cmd_nocache = `docker build --no-cache -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`
+            @info(cmd_nocache)
+            run(cmd_nocache)
         end
         @info("Done building julia docker image for tail $tail_sha_abv.")
 
@@ -81,11 +85,15 @@ function build(tail::Commit, target::Commit)
         _replace_on_1st_line(filepath_docker_target, "tail", tail_sha_abv) # replace image name inside Dockerfile.target
         
         try
-            run(`docker build -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`)
+            cmd_target = `docker build -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`
+            @info(cmd_target)
+            run(cmd_target)
         catch e
             # Will try to build in panic mode
             @warn("Got error trying to build target. Will try to build in panic mode: $e")
-            run(`docker build --no-cache -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target.panic")) $(joinpath(SRC_DIR, "docker"))`)
+            cmd_target_panic = `docker build --no-cache -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target.panic")) $(joinpath(SRC_DIR, "docker"))`
+            @info(cmd_target_panic)
+            run(cmd_target_panic)
         end
         @info("Done building julia docker image for target $target_sha_abv.")
     finally
@@ -103,7 +111,7 @@ function run_container!(response::WorkerTaskResponse, c::Commit, pkg::PkgRef)
     try 
         @info("Going to test $(pkg.name) at $(image)")
         cmd = `docker run --rm $image ./julia/julia -e (Pkg.update();Pkg.test(\"$(pkg.name)\"))`
-        println(cmd)
+        @info(cmd)
         run(pipeline(cmd, stdout=output_file, stderr=err_file))
         @info("Test finished for $(pkg.name)")
 
@@ -189,8 +197,7 @@ function gen_julia_pkgs_file(r::WorkerTaskRequest)
     pkgs_file = open(pkgs_filepath, "w")
     write(pkgs_file, "Pkg.update()\n")
 
-    for p in r.pkg_list
-        #p is PkgRef
+    for p in r.pkg_list # p isa PkgRef
         if p.name in av
             write(pkgs_file, "Pkg.add(\"$(p.name)\")\n")
         else
