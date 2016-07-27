@@ -78,20 +78,3 @@ type HostState
 
     HostState(ip, port, working_dir, sleep_time) = new(ip, port, working_dir, now(), Array(AbstractString, 0), Dict{AbstractString, Vector{WorkerTaskResponse}}(), Array(WorkerSock, 0), Array(PkgRef, 0), "", :IDLE, Condition(), Condition(), sleep_time)
 end
-
-gettail(hs::HostState) = Commit(hs.tail_sha, hs.commits[end].subject)
-
-function report_str(h::HostState) # :: String
-    r = """
-    Current tail: $(h.tail_sha)
-    # of available workers: $(length(h.workers))
-    """
-
-    for c in h.commits
-        r = r * "$(sha_abbrev(c)) : $(getstatus(c))"
-        if c.sha == tail_sha
-            break
-        end
-    end
-    r
-end

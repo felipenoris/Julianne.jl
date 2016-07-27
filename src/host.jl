@@ -5,7 +5,7 @@ import Base.IPAddr
 
 rm_if_exists(f) = isfile(f) && rm(f)
 istail(c::Commit) = HOST.tail_sha == c.sha
-gettail() = Commit(HOST.tail_sha, "")
+gettail() = Commit(HOST.tail_sha, hs.commits[end].subject)
 wait_host() = wait(HOST.idle_c)
 isidle() = HOST.status == :IDLE
 isbusy() = HOST.status == :BUSY
@@ -18,6 +18,35 @@ hasfailure(item) = getstatus(item) ∈ [ :FAILED, :PENDING_WITH_FAILURE ]
 isunknown(item) = getstatus(item) ∈ [ :UNKNOWN, :PENDING_WITH_UNKNOWN ]
 busy!() = (HOST.status = :BUSY)
 idle!() = (HOST.status = :IDLE; notify(HOST.idle_c))
+
+#"|- ✔︎✘⎿"
+
+function report_str() # :: String
+    r = """
+    Current tail: $(HOST.tail_sha)
+    # of available workers: $(length(HOST.workers))
+    """
+    for c in HOST.commits
+        r = r * "$(sha_abbrev(c)) : $(getstatus(c))\n"
+        
+        if isdone(c)
+            failures, stvec = gettestedpkg(c, [:FAILED, :UNKNOWN])
+            if !isempty(failures)
+                for i in 1:length(failures)
+                    pkg = failures[i]
+                    st = stvec[i]
+                    r = r * "⎿ $(pkg.name) $(st)\n"
+                end
+            end
+        end
+
+        if istail(c)
+            break
+        end
+    end
+    r
+end
+
 
 """
     getstatus(c::Commit) :: Symbol
@@ -184,25 +213,35 @@ function start()
         # dispatch workload
         start_next_test()
         @info("Test iteration $i results:")
-        @info(report_str(HOST))
+        @info(report_str())
         i += 1
     end
     yield()
 end
 
-function gettestedpkg(c::Commit) # :: Set{PkgRef}
-    r = Set()
+function gettestedpkg(c::Commit, withstatus::Vector{Symbol} = [:ANY]) # :: Vector{PkgRef}, Vector{Symbol} status
+    r = Array(PkgRef,0)
+    st = Array(Symbol, 0)
     if haskey(HOST.results, c)
         responses = HOST.results[c]
         for wtr in responses
-            push!(r, wtr.request.pkg)
+            if :ANY in withstatus
+                push!(r, wtr.request.pkg)
+                push!(st, wtr.status)
+            else
+                if wtr.status in withstatus
+                    push!(r, wtr.request.pkg)
+                    push!(st, wtr.status)
+                end
+            end
         end
     end
-    return r
+    return r, st
 end
+gettestedpkg(c::Commit, withstatus::Symbol) = gettestedpkg(c, [withstatus])
 
 function getuntestedpkg(c::Commit)
-    tested = gettestedpkg(c)
+    tested, _ = gettestedpkg(c)
     return setdiff(HOST.packages, tested)
 end
 
@@ -261,17 +300,17 @@ function start_next_test()
     end
 end
 
-function pop_worker!(hs::HostState = HOST)
-    while isempty(hs.workers)
+function pop_worker!()
+    while isempty(HOST.workers)
         @info("No workers available. Will wait...")
-        wait(hs.workers_c)
+        wait(HOST.workers_c)
     end
-    pop!(hs.workers)
+    pop!(HOST.workers)
 end
 
-function add_worker!(w::WorkerSock, hs::HostState = HOST)
-    unshift!(hs.workers, w)
-    notify(hs.workers_c)
+function add_worker!(w::WorkerSock)
+    unshift!(HOST.workers, w)
+    notify(HOST.workers_c)
 end
 
 function dispatch(c::Commit, p::PkgRef, ws::WorkerSock)
