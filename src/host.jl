@@ -106,6 +106,7 @@ end
 function schedule_listen_task()
     @schedule begin
         srvr = listen(HOST.ip, HOST.port)
+        @info("Server started at $(HOST.ip):$(HOST.port)")
         while true
             socket = accept(srvr)
             @async begin
@@ -275,9 +276,11 @@ end
 
 function dispatch(c::Commit, p::PkgRef, ws::WorkerSock)
     try
+        @info("Will dispatch $(sha_abbrev(c)) $(p.name) to $(ws.worker.id)")
         serialize(ws.connection, WorkerTaskRequest(p, c, gettail(), HOST.packages))
         wtr = deserialize(ws.connection) :: WorkerTaskResponse # WorkerTaskResponse
         update_result(c, wtr)
+        @info("Got result from $(ws.worker.id): $(sha_abbrev(c)) $(p.name): $(wtr.status)")
         add_worker!(ws)
     catch e
         @warn("Had problems with worker $ws.")
