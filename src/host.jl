@@ -5,7 +5,7 @@ import Base.IPAddr
 
 rm_if_exists(f) = isfile(f) && rm(f)
 istail(c::Commit) = HOST.tail_sha == c.sha
-gettail() = Commit(HOST.tail_sha, hs.commits[end].subject)
+gettail() = Commit(HOST.tail_sha, HOST.commits[end].subject)
 wait_host() = wait(HOST.idle_c)
 isidle() = HOST.status == :IDLE
 isbusy() = HOST.status == :BUSY
