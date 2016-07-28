@@ -13,6 +13,9 @@ export TimeoutException, timeout
 
 include("timeout.jl")
 include("types.jl")
+
+const HOST = HostState()
+
 include("host.jl")
 include("hostconfig.jl")
 include("worker.jl")

@@ -19,6 +19,8 @@ isunknown(item) = getstatus(item) ∈ [ :UNKNOWN, :PENDING_WITH_UNKNOWN ]
 busy!() = (HOST.status = :BUSY)
 idle!() = (HOST.status = :IDLE; notify(HOST.idle_c))
 
+register_package(pkgname, url="") = push!(HOST.packages, PkgRef(pkgname, url))
+
 #"|- ✔︎✘⎿"
 
 function report_str() # :: String
@@ -161,19 +163,6 @@ function handshake(socket::TCPSocket)
     @info("Host: New worker connected! Go for it, '$(worker.id)' !")
 end
 
-function start(ip::IPAddr, port::Int, working_dir="")
-    HOST.ip = ip
-    HOST.port = port
-    start(working_dir)
-end
-
-function start(working_dir="")
-    if working_dir != "" 
-        HOST.working_dir = working_dir
-    end
-    start()
-end
-
 function checkhostconfig()
     if isempty(HOST.packages)
         throw(ErrorException("No packages to be tested. Will stop the HOST."))
@@ -184,40 +173,11 @@ function checkhostconfig()
     end
 end
 
-# Set new TAIL for the HOST
-function settail(c::Commit)
-    HOST.tail_sha = c.sha
-    @info("Ladies and Gentlemen: our new TAIL is $(sha_abbrev(c))!")
+function settail(sha::AbstractString)
+    HOST.tail_sha = sha
+    @info("Ladies and Gentlemen: our new TAIL is $(sha_abbrev(sha))!")
 end
-
-function start()
-    # Checks for Host configuration consistency
-    checkhostconfig()
-    schedule_listen_task()
-
-    # start local workers
-    if nprocs() == 1
-        @info("No local workers will be created. Use addprocs(n) before running `start_host()` to allow for local workers.")
-    else
-        for ww in procs()
-            ww == 1 && continue
-            @spawnat ww Worker.start("Local worker $ww", HOST.ip, HOST.port)
-        end
-    end
-
-    i = 1
-    # main loop for server work
-    while true
-        pull_julia_repo()
-        @info("Starting iteration $i...")
-        # dispatch workload
-        start_next_test()
-        @info("Test iteration $i results:")
-        @info(report_str())
-        i += 1
-    end
-    yield()
-end
+settail(c::Commit) = settail(c.sha)
 
 function gettestedpkg(c::Commit, withstatus::Vector{Symbol} = [:ANY]) # :: Vector{PkgRef}, Vector{Symbol} status
     r = Array(PkgRef,0)
@@ -332,6 +292,46 @@ function update_result(c::Commit, wtr::WorkerTaskResponse)
         HOST.results[c] = Array(WorkerTaskResponse, 0)
     end
     push!(HOST.results[c], wtr)
+end
+
+"""
+ip: Host IP address to listen on
+port: Host port to listen on
+working_dir: working directory to pull Julia's repo on host
+sleep_time: sleep time between iterations in seconds
+"""
+function start(ip::IPAddr, port::Int, working_dir=pwd(), sleep_time=60*60)
+    HOST.ip = ip
+    HOST.port = port
+    HOST.working_dir = working_dir
+    HOST.sleep_time = sleep_time
+
+    # Checks for Host configuration consistency
+    checkhostconfig()
+    schedule_listen_task()
+
+    # start local workers
+    if nprocs() == 1
+        @info("No local workers will be created. Use addprocs(n) before running `start_host()` to allow for local workers.")
+    else
+        for ww in procs()
+            ww == 1 && continue
+            @spawnat ww Worker.start("Local worker $ww", HOST.ip, HOST.port)
+        end
+    end
+
+    i = 1
+    # main loop for server work
+    while true
+        pull_julia_repo()
+        @info("Starting iteration $i...")
+        # dispatch workload
+        start_next_test()
+        @info("Test iteration $i results:")
+        @info(report_str())
+        i += 1
+    end
+    yield()
 end
 
 # TODO: listen to github mentions
