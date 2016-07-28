@@ -24,12 +24,13 @@ register_package(pkgname, url="") = push!(HOST.packages, PkgRef(pkgname, url))
 #"|- ✔︎✘⎿"
 
 function report_str() # :: String
+    tail = gettail()
     r = """
-    Current tail: $(HOST.tail_sha)
+    Current tail: $(tail.sha)-$(tail.subject)
     # of available workers: $(length(HOST.workers))
     """
     for c in HOST.commits
-        r = r * "$(sha_abbrev(c)) : $(getstatus(c))\n"
+        r = r * "$(sha_abbrev(c))-$(c.subject): $(getstatus(c))\n"
         
         if isdone(c)
             failures, stvec = gettestedpkg(c, [:FAILED, :UNKNOWN])
@@ -49,9 +50,8 @@ function report_str() # :: String
     r
 end
 
-
 """
-    getstatus(c::Commit) :: Symbol
+    getstatus(item) :: Symbol
 
 :PASSED, :FAILED, :UNKNOWN
 :UNTESTED, :PENDING, :PENDING_WITH_FAILURE, :PENDING_WITH_UNKNOWN
@@ -239,6 +239,7 @@ function start_next_test()
                     settail(tc)
                 else
                     @info("Nothing to do... Let's get some sleep.")
+                    @info("Current tail is:\n$(tc.sha)-$(tc.subject)")
                     sleep(HOST.sleep_time)
                 end
                 return

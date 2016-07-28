@@ -25,6 +25,9 @@ Edit `hostconfig.jl`.
 # List of packages to be tested
 register_package("BusinessDays")
 register_package("Calculus")
+
+# Packages that are not in METADATA can be registered using a URL
+register_package("PassingPkg", "https://github.com/juliannebot/PassingPkg.jl.git")
 #...
 
 # Set last known Commit which all tests pass
@@ -37,7 +40,7 @@ settail("0030eec2f332f353e6890ca289ac2aca55532dde")
 ```julia
 julia> using Julianne
 
-julia> Julianne.start(ip"127.0.0.1", 8023)
+julia> Julianne.start(ip"127.0.0.1", 8023) # Will listen for connections on provided ip/port
 ```
 
 ### Worker
@@ -45,7 +48,7 @@ julia> Julianne.start(ip"127.0.0.1", 8023)
 ```julia
 julia> using Julianne
 
-julia> Julianne.Worker.start("worker 1", ip"127.0.0.1", 8023)
+julia> Julianne.Worker.start("worker 1", ip"127.0.0.1", 8023) # will connect to a Host
 ```
 
 Both Host and Worker will log to file `julianne.log` at current directory (`pwd()`).
