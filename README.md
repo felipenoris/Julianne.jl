@@ -14,6 +14,7 @@ Please, donate your computer power! \o/
 ## Requirements
 
 Julia 0.4
+
 Docker
 
 ## Configuration
