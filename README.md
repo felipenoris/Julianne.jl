@@ -10,3 +10,41 @@ Travis is currently testing `Base.runtests()`. Meet @juliannebot: she will run `
 Please, donate your computer power! \o/
 
 *JuliaCon2016 hackathon*
+
+## Requirements
+
+Julia 0.4
+Docker
+
+## Configuration
+
+Edit `hostconfig.jl`. 
+
+```julia
+# List of packages to be tested
+register_package("BusinessDays")
+register_package("Calculus")
+#...
+
+# Set last known Commit which all tests pass
+settail("0030eec2f332f353e6890ca289ac2aca55532dde")
+```
+## Usage
+
+### Host
+
+```julia
+julia> using Julianne
+
+julia> Julianne.start(ip"127.0.0.1", 8023)
+```
+
+### Worker
+
+```julia
+julia> using Julianne
+
+julia> Julianne.Worker.start("worker 1", ip"127.0.0.1", 8023)
+```
+
+Both Host and Worker will log to file `julianne.log` at current directory (`pwd()`).
