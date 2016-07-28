@@ -202,7 +202,7 @@ function gen_julia_pkgs_file(r::WorkerTaskRequest)
             write(pkgs_file, "Pkg.add(\"$(p.name)\")\n")
         else
             if p.url == ""
-                @warn("$(p.name) not found in METADATA. No URL provided for this package.")
+                @warn("$(p.name) will NOT be tested. It was not found in METADATA and there's no URL provided for this package.")
             else
                 write(pkgs_file, "Pkg.clone(\"$(p.url)\")\n")
             end

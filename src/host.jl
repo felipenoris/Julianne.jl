@@ -26,7 +26,8 @@ register_package(pkgname, url="") = push!(HOST.packages, PkgRef(pkgname, url))
 function report_str() # :: String
     tail = gettail()
     r = """
-    Current tail: $(tail.sha)-$(tail.subject)
+    Current tail is:
+    $(tail.sha)-$(tail.subject)
     # of available workers: $(length(HOST.workers))
     """
     for c in HOST.commits
