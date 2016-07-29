@@ -310,6 +310,7 @@ function start(ip::IPAddr, port::Int, working_dir=pwd(), sleep_time=60*60)
 
     # Checks for Host configuration consistency
     checkhostconfig()
+    gen_state_json()
     schedule_listen_task()
 
     # start local workers
@@ -331,9 +332,17 @@ function start(ip::IPAddr, port::Int, working_dir=pwd(), sleep_time=60*60)
         start_next_test()
         @info("Test iteration $i results:")
         @info(report_str())
+        gen_state_json()
         i += 1
     end
     yield()
+end
+
+function gen_state_json()
+    io = open(filepath(HOST.working_dir, "julianne_state.json"), "w")
+    JSON.print(io, HOST)
+    flush(io)
+    close(io)
 end
 
 # TODO: listen to github mentions

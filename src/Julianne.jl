@@ -3,6 +3,7 @@ module Julianne
 
 using GitHub
 using Logging
+using JSON
 import Base.IPAddr
 import Base: notify_error, hash, ==
 
