@@ -229,6 +229,9 @@ function start_next_test()
                 # TODO: This may do bisection in the future...
                 # For now, go test the next Commit in list until we reach the TAIL
                 if istail(tc)
+                    @info("Nothing to do... Let's get some sleep.")
+                    @info("Current tail is:\n$(tc.sha)-$(tc.subject)")
+                    sleep(HOST.sleep_time)
                     return  # Does nothing until we have new Commits to test
                 else
                     continue # goes to next Commit
@@ -238,11 +241,10 @@ function start_next_test()
                     # YAY! This is our new TAIL!
                     @info("$(sha_abbrev(tc)) is done testing and PASSED.")
                     settail(tc)
-                else
-                    @info("Nothing to do... Let's get some sleep.")
-                    @info("Current tail is:\n$(tc.sha)-$(tc.subject)")
-                    sleep(HOST.sleep_time)
                 end
+                @info("Nothing to do... Let's get some sleep.")
+                @info("Current tail is:\n$(tc.sha)-$(tc.subject)")
+                sleep(HOST.sleep_time)
                 return
             end
         else

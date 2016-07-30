@@ -21,4 +21,4 @@ register_package("StatsBase")
 # known to fail: Cbc, Coverage, DataStructures, ForwardDiff, Gadfly, Images, JuMP, LightXML, NullableArrays, RCall, FilePaths
 
 # Set last known Commit which all tests pass
-settail("e717ded47a55d3526a10207d8d75ae5c9ab9646f")
+settail("ba46baf63fa5e9665aa6c7cf5c4bc473266b6212")
