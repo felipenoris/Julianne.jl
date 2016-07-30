@@ -304,16 +304,19 @@ port: Host port to listen on
 working_dir: working directory to pull Julia's repo on host
 sleep_time: sleep time between iterations in seconds
 """
-function start(ip::IPAddr, port::Int, working_dir=pwd(), sleep_time=60*60)
+function start(ip::IPAddr, port::Int, webapp_ip, webapp_port, working_dir=pwd(), sleep_time=60*60)
     HOST.ip = ip
     HOST.port = port
     HOST.working_dir = working_dir
     HOST.sleep_time = sleep_time
+    HOST.webapp_ip = webapp_ip
+    HOST.webapp_port = webapp_port
 
     # Checks for Host configuration consistency
     checkhostconfig()
     gen_state_json()
     schedule_listen_task()
+    start_webapp()
 
     # start local workers
     if nprocs() == 1
@@ -339,6 +342,7 @@ function start(ip::IPAddr, port::Int, working_dir=pwd(), sleep_time=60*60)
     end
     yield()
 end
+start(ip::IPAddr, port::Int) = start(ip, port, ip, 80)
 
 function gen_state_json()
     io = open(filepath(HOST.working_dir, "julianne_state.json"), "w")

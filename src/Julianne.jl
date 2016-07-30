@@ -19,6 +19,7 @@ const HOST = HostState()
 
 include("host.jl")
 include("hostconfig.jl")
+include("web.jl")
 include("worker.jl")
 include("api.jl")
 
