@@ -314,7 +314,7 @@ function start(ip::IPAddr, port::Int, webapp_ip, webapp_port, working_dir=pwd(),
 
     # Checks for Host configuration consistency
     checkhostconfig()
-    gen_state_json()
+    # gen_state_json()
     schedule_listen_task()
     start_webapp()
 
