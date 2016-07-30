@@ -345,7 +345,7 @@ end
 start(ip::IPAddr, port::Int) = start(ip, port, ip, 80)
 
 function gen_state_json()
-    io = open(filepath(HOST.working_dir, "julianne_state.json"), "w")
+    io = open(joinpath(HOST.working_dir, "julianne_state.json"), "w")
     JSON.print(io, HOST)
     flush(io)
     close(io)
