@@ -337,19 +337,19 @@ function start(ip::IPAddr, port::Int, webapp_ip, webapp_port, working_dir=pwd(),
         start_next_test()
         @info("Test iteration $i results:")
         @info(report_str())
-        gen_state_json()
+        # gen_state_json()
         i += 1
     end
     yield()
 end
 start(ip::IPAddr, port::Int) = start(ip, port, ip, 80)
 
-function gen_state_json()
-    io = open(joinpath(HOST.working_dir, "julianne_state.json"), "w")
-    JSON.print(io, HOST)
-    flush(io)
-    close(io)
-end
+#function gen_state_json()
+#    io = open(joinpath(HOST.working_dir, "julianne_state.json"), "w")
+#    JSON.print(io, HOST)
+#    flush(io)
+#    close(io)
+#end
 
 # TODO: listen to github mentions
 
