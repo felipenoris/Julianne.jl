@@ -79,14 +79,18 @@ RUN yum -y install libedit-devel libffi-devel swig python-devel
 
 RUN git clone https://github.com/JuliaLang/julia.git
 
-ADD TAIL TAIL
+ADD julia-packages.jl julia-packages.jl
 
-RUN cd julia && git pull && git checkout $(cat ../TAIL)
+RUN cd julia && git pull
 
 RUN cd julia && make -j"$(nproc --all)"
 
 RUN ./julia/julia -e 'Pkg.init()'
 
-ADD julia-packages.jl julia-packages.jl
-
 RUN ./julia/julia -e 'include("julia-packages.jl")'
+
+ADD TARGET TARGET
+
+RUN cd julia && git pull && git checkout $(cat ../TARGET) && make clean && make -j"$(nproc --all)"
+
+RUN ./julia/julia -e 'Pkg.update()'

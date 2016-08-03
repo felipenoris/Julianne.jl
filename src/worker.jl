@@ -16,18 +16,6 @@ using Logging
 
 const SRC_DIR = dirname(@__FILE__)
 
-# Utility function for method build
-function _replace_on_1st_line(filepath, before_str, after_str)
-    f = open(filepath)
-    l = readlines(f)
-    close(f)
-    l[1] = replace(l[1], before_str, after_str)
-    f = open(filepath, "w")
-    write(f, l)
-    flush(f)
-    close(f)
-end
-
 # Utility function for method run_container
 function _has_string(filepath, str)
     f = open(filepath)
@@ -55,51 +43,26 @@ function update_docker_marker(marker_name::AbstractString, sha::AbstractString)
 end
 
 # Build docker images
-function build(tail::Commit, target::Commit)
-    const tail_sha_abv = sha_abbrev(tail)
+function build(target::Commit)
     const target_sha_abv = sha_abbrev(target)
-    const filepath_docker_tail = joinpath(SRC_DIR, "docker", "Dockerfile.tail")
-    const filepath_docker_target = joinpath(SRC_DIR, "docker", "Dockerfile.target")
+    const filepath_dockerfile = joinpath(SRC_DIR, "docker", "Dockerfile")
+
+    @info("Building julia docker image for $target_sha_abv...")
+    update_docker_marker("TARGET", target.sha)
 
     try
-        # Build tail
-        @info("Building julia docker image for tail $tail_sha_abv...")
-        update_docker_marker("TAIL", tail.sha)
-
-        try
-            cmd_tail = `docker build -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`
-            @info(cmd_tail)
-            run(cmd_tail)
-        catch e
-            # Will to to build with --no-cache enabled
-            @warn("Got error trying to build tail. Will try to build with no cache: $e")
-            cmd_nocache = `docker build --no-cache -t julia:$tail_sha_abv -f $filepath_docker_tail $(joinpath(SRC_DIR, "docker"))`
-            @info(cmd_nocache)
-            run(cmd_nocache)
-        end
-        @info("Done building julia docker image for tail $tail_sha_abv.")
-
-        # Build target
-        @info("Building julia docker image for target $target_sha_abv...")
-        update_docker_marker("TARGET", target.sha)
-        _replace_on_1st_line(filepath_docker_target, "tail", tail_sha_abv) # replace image name inside Dockerfile.target
-        
-        try
-            cmd_target = `docker build -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target")) $(joinpath(SRC_DIR, "docker"))`
-            @info(cmd_target)
-            run(cmd_target)
-        catch e
-            # Will try to build in panic mode
-            @warn("Got error trying to build target. Will try to build in panic mode: $e")
-            cmd_target_panic = `docker build --no-cache -t julia:$target_sha_abv -f $(joinpath(SRC_DIR, "docker", "Dockerfile.target.panic")) $(joinpath(SRC_DIR, "docker"))`
-            @info(cmd_target_panic)
-            run(cmd_target_panic)
-        end
-        @info("Done building julia docker image for target $target_sha_abv.")
-    finally
-        # Put it back, so it will work next time
-        _replace_on_1st_line(filepath_docker_target, tail_sha_abv, "tail")
+        build_cmd = `docker build -t julia:$target_sha_abv -f $filepath_dockerfile $(joinpath(SRC_DIR, "docker"))`
+        @info(build_cmd)
+        run(build_cmd)
+    catch e
+        # Will to to build with --no-cache enabled
+        @warn("Got error trying to build target. Will try to build with no cache: $e")
+        build_nocache_cmd = `docker build --no-cache -t julia:$target_sha_abv -f $filepath_dockerfile $(joinpath(SRC_DIR, "docker"))`
+        @info(build_nocache_cmd)
+        run(build_nocache_cmd)
     end
+
+    @info("Done building julia docker image for target $target_sha_abv.")
 end
 
 function run_container!(response::WorkerTaskResponse, c::Commit, pkg::PkgRef)
@@ -138,7 +101,7 @@ function testpkg(wi::WorkerInfo, request::WorkerTaskRequest) # :: WorkerTaskResp
     gen_julia_pkgs_file(request)
     response = WorkerTaskResponse(request, :UNTESTED, "", VERSION, wi) # TODO: change VERSION to Pkg version
     try
-        build(request.tail, request.target)
+        build(request.target)
     catch e
         response.status = :UNKNOWN
         response.error_message = "Error building docker image: $e"
