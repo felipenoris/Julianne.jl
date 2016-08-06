@@ -23,6 +23,7 @@ function report_html() # :: String
     <head>
         <meta charset=\"UTF-8\">
         <meta name=\"description\" content=\"Julianne.jl status\">
+        <title>Julianne</title>
     </head>
     <body>
     <h1>
