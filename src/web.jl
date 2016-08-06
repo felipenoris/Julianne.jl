@@ -38,7 +38,7 @@ function report_html() # :: String
     <p>
     """
     for c in HOST.commits
-        r = r * "<br> $(sha_abbrev(c))-$(c.subject): $(getstatus(c))\n"
+        r = r * "<br> $(sha_abbrev(c))-$(c.subject): <b> $(getstatus(c)) </b> \n"
         
         if isdone(c)
             failures, stvec = gettestedpkg(c, [:FAILED, :UNKNOWN])
