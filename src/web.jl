@@ -25,6 +25,11 @@ function report_html() # :: String
         <meta name=\"description\" content=\"Julianne.jl status\">
     </head>
     <body>
+    <h1>
+        <a href=\"https://github.com/felipenoris/Julianne.jl\">Julianne</a> status
+    </h1>
+    
+    <hr>
     <ul>
         <li> Current tail is: <b> $(tail.sha)-$(tail.subject) </b></li>
         <li> # of available workers: <b> $(length(HOST.workers)) </b></li>
